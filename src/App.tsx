@@ -322,7 +322,51 @@ export default function App() {
   const [gameState, setGameState] = useState<'waiting' | 'flying' | 'crashed'>('waiting');
   const [multiplier, setMultiplier] = useState(1.00);
   const [countdown, setCountdown] = useState(6); // betting timer
-  const [forcedMultiplier, setForcedMultiplier] = useState<number | null>(null);
+  const [forcedMultiplier, setForcedMultiplier] = useState<number | null>(() => {
+    try {
+      const saved = localStorage.getItem('aviator_forced_multiplier');
+      return saved ? parseFloat(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [forcedMultiplierMode, setForcedMultiplierMode] = useState<'persistent' | 'single'>(() => {
+    try {
+      const saved = localStorage.getItem('aviator_forced_multiplier_mode');
+      return (saved === 'single' || saved === 'persistent') ? saved : 'persistent';
+    } catch {
+      return 'persistent';
+    }
+  });
+
+  const forcedMultiplierRef = useRef<number | null>(forcedMultiplier);
+  forcedMultiplierRef.current = forcedMultiplier;
+
+  const forcedMultiplierModeRef = useRef<'persistent' | 'single'>(forcedMultiplierMode);
+  forcedMultiplierModeRef.current = forcedMultiplierMode;
+
+  const handleSetForcedMultiplier = (val: number | null, mode?: 'persistent' | 'single') => {
+    const nextMode = mode || forcedMultiplierMode;
+    if (mode) {
+      setForcedMultiplierMode(mode);
+      forcedMultiplierModeRef.current = mode;
+      localStorage.setItem('aviator_forced_multiplier_mode', mode);
+    }
+    setForcedMultiplier(val);
+    forcedMultiplierRef.current = val;
+
+    if (val !== null && val >= 1.0) {
+      localStorage.setItem('aviator_forced_multiplier', val.toString());
+      // If plane is currently flying and hasn't crashed, immediately update active flight's crash target!
+      if (gameState === 'flying') {
+        currentCrashValue.current = val;
+      }
+      showToast(`🎯 Multiplier Injected: ${val.toFixed(2)}x (${nextMode === 'persistent' ? 'All Rounds Locked' : 'Next Round Only'})`, 'success');
+    } else {
+      localStorage.removeItem('aviator_forced_multiplier');
+      showToast('Forced multiplier removed. Provably Fair RNG restored.', 'info');
+    }
+  };
 
   // Gradually place bot bets during waiting countdown (real-time live increasing count)
   useEffect(() => {
@@ -456,9 +500,14 @@ export default function App() {
 
     // Calculate this flight's crash point
     let crashPoint = 1.05;
-    if (forcedMultiplier !== null) {
-      crashPoint = forcedMultiplier;
-      setForcedMultiplier(null); // clear forced multiplier after use
+    const activeForced = forcedMultiplierRef.current;
+    if (activeForced !== null && activeForced >= 1.00) {
+      crashPoint = activeForced;
+      if (forcedMultiplierModeRef.current === 'single') {
+        setForcedMultiplier(null);
+        forcedMultiplierRef.current = null;
+        localStorage.removeItem('aviator_forced_multiplier');
+      }
     } else {
       // Realistic Aviator distribution curve
       const r = Math.random();
@@ -469,8 +518,12 @@ export default function App() {
       }
     }
     
-    // Safety cap
-    currentCrashValue.current = Math.max(1.00, Math.min(crashPoint, settingsRef.current.maxMultiplier));
+    // If explicitly injected by operator, honor exact target without arbitrary clamp; else cap to maxMultiplier
+    if (activeForced !== null && activeForced >= 1.00) {
+      currentCrashValue.current = Math.max(1.00, crashPoint);
+    } else {
+      currentCrashValue.current = Math.max(1.00, Math.min(crashPoint, settingsRef.current.maxMultiplier));
+    }
 
     // Resolve scheduled/queued bets to active status and deduct balance
     let totalDeduction = 0;
@@ -1087,6 +1140,10 @@ export default function App() {
           withdrawals={withdrawals}
           pastRounds={recentMultipliers}
           forcedMultiplier={forcedMultiplier}
+          forcedMultiplierMode={forcedMultiplierMode}
+          gameState={gameState}
+          currentMultiplier={multiplier}
+          countdown={countdown}
           onUpdateSettings={(newSettings) => setSettings((s) => ({ ...s, ...newSettings }))}
           onApproveDeposit={handleApproveDeposit}
           onRejectDeposit={handleRejectDeposit}
@@ -1094,7 +1151,7 @@ export default function App() {
           onApproveWithdrawal={handleApproveWithdrawal}
           onRejectWithdrawal={handleRejectWithdrawal}
           onApproveAllWithdrawals={handleApproveAllWithdrawals}
-          onSetForcedMultiplier={setForcedMultiplier}
+          onSetForcedMultiplier={handleSetForcedMultiplier}
           onResetStats={handleResetStats}
           onPurgeAllDemoData={handlePurgeAllDemoData}
           onAdjustBalance={handleAdjustBalance}

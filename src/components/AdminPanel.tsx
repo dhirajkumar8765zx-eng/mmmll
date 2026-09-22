@@ -37,6 +37,10 @@ interface AdminPanelProps {
   withdrawals: WithdrawRequest[];
   pastRounds: PastRound[];
   forcedMultiplier: number | null;
+  forcedMultiplierMode?: 'persistent' | 'single';
+  gameState?: 'waiting' | 'flying' | 'crashed';
+  currentMultiplier?: number;
+  countdown?: number;
   onUpdateSettings: (settings: Partial<GameSettings>) => void;
   onApproveDeposit: (id: string) => void;
   onRejectDeposit: (id: string) => void;
@@ -45,7 +49,7 @@ interface AdminPanelProps {
   onApproveAllDeposits?: () => void;
   onApproveAllWithdrawals?: () => void;
   onPurgeAllDemoData?: () => void;
-  onSetForcedMultiplier: (multiplier: number | null) => void;
+  onSetForcedMultiplier: (multiplier: number | null, mode?: 'persistent' | 'single') => void;
   onResetStats: () => void;
   onAdjustBalance?: (newBalance: number) => void;
   onBackToGame?: () => void;
@@ -60,6 +64,10 @@ function AdminPanel({
   withdrawals,
   pastRounds,
   forcedMultiplier,
+  forcedMultiplierMode = 'persistent',
+  gameState = 'waiting',
+  currentMultiplier = 1.0,
+  countdown = 6,
   onUpdateSettings,
   onApproveDeposit,
   onRejectDeposit,
@@ -81,6 +89,7 @@ function AdminPanel({
   const [telegramSupportInput, setTelegramSupportInput] = useState(settings.telegramSupportId || '@lottaygent');
   const [instantApprovalInput, setInstantApprovalInput] = useState(settings.instantApproval === true);
   const [customMultiplierInput, setCustomMultiplierInput] = useState('');
+  const [multiplierMode, setMultiplierMode] = useState<'persistent' | 'single'>(forcedMultiplierMode);
   const [minBetInput, setMinBetInput] = useState(settings.minBet);
   const [maxBetInput, setMaxBetInput] = useState(settings.maxBet);
   const [rtpInput, setRtpInput] = useState(97); // simulated RTP slider
@@ -89,6 +98,8 @@ function AdminPanel({
   const [withdrawFilter, setWithdrawFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [proofModalUrl, setProofModalUrl] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ msg: string; type: 'success' | 'info' | 'error' } | null>(null);
+
+  const QUICK_MULTIPLIER_PRESETS = [1.20, 1.50, 2.00, 3.00, 5.00, 10.00, 20.00, 50.00, 100.00];
 
   const notify = (msg: string, type: 'success' | 'info' | 'error' = 'success') => {
     setNotice({ msg, type });
@@ -136,21 +147,33 @@ function AdminPanel({
     notify('Payment gateway, instant processing, and support configurations updated!', 'success');
   };
 
-  const handleSetMultiplier = (e: React.FormEvent) => {
-    e.preventDefault();
-    const val = parseFloat(customMultiplierInput);
+  const handleQuickInject = (val: number, andGoToGame: boolean = false) => {
+    onSetForcedMultiplier(val, multiplierMode);
+    notify(`Target set to ${val.toFixed(2)}x (${multiplierMode === 'persistent' ? 'Always Locked' : 'Next 1 Round Only'})`, 'success');
+    if (andGoToGame && onBackToGame) {
+      setTimeout(() => onBackToGame(), 300);
+    }
+  };
+
+  const handleSetMultiplier = (e?: React.FormEvent, andGoToGame: boolean = false) => {
+    if (e) e.preventDefault();
+    const cleanStr = customMultiplierInput.replace(/[^0-9.]/g, '');
+    const val = parseFloat(cleanStr);
     if (isNaN(val) || val < 1.0) {
-      notify('Please enter a valid multiplier >= 1.0', 'error');
+      notify('Please enter a valid multiplier >= 1.00 (e.g. 5 or 5.00)', 'error');
       return;
     }
-    onSetForcedMultiplier(val);
+    onSetForcedMultiplier(val, multiplierMode);
     setCustomMultiplierInput('');
-    notify(`Success! Next round forced to fly away at ${val.toFixed(2)}x`, 'success');
+    notify(`Success! Injected ${val.toFixed(2)}x (${multiplierMode === 'persistent' ? 'Always Locked' : 'Next 1 Round Only'})`, 'success');
+    if (andGoToGame && onBackToGame) {
+      setTimeout(() => onBackToGame(), 300);
+    }
   };
 
   const handleClearForcedMultiplier = () => {
     onSetForcedMultiplier(null);
-    notify('Forced multiplier removed. Random generator active.', 'info');
+    notify('Forced multiplier removed. Provably Fair random generator active.', 'info');
   };
 
   const handleSaveLimits = (e: React.FormEvent) => {
@@ -362,65 +385,210 @@ function AdminPanel({
         {/* Left Side: Forms */}
         <div className="space-y-6 lg:col-span-7">
           
-          {/* Forced Multiplier Card */}
-          <div className="p-5 bg-zinc-900/95 border border-zinc-800 rounded-2xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/5 rounded-full blur-xl pointer-events-none" />
-            <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-3">
-              <Sliders className="w-4 h-4 text-purple-400" />
-              Game Loop & Multiplier Control
-            </h3>
-            <p className="text-xs text-zinc-400 mb-4">
-              Dictate the next flight crash multiplier. Allows administrators to set an exact multiplier target (e.g., 100.00x or 2.50x) or leave blank for automatic provably fair RNG generation.
+          {/* Forced Multiplier Card with Real-time Flight Engine Sync */}
+          <div className="p-5 bg-zinc-900/95 border border-purple-900/40 rounded-2xl relative overflow-hidden shadow-xl shadow-purple-950/20" id="admin_multiplier_control_card">
+            <div className="absolute top-0 right-0 w-36 h-36 bg-purple-500/10 rounded-full blur-2xl pointer-events-none" />
+            
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <Sliders className="w-4 h-4 text-purple-400" />
+                <span>Inject Multiplier Control (RNG Override)</span>
+              </h3>
+
+              {/* Real-time Flight Loop Indicator */}
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-950 border border-zinc-800 text-[11px] font-mono">
+                {gameState === 'flying' ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-emerald-400 font-bold">FLYING NOW: {currentMultiplier.toFixed(2)}x</span>
+                  </>
+                ) : gameState === 'waiting' ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                    <span className="text-amber-300 font-medium">Countdown: {countdown}s</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-red-500" />
+                    <span className="text-red-400 font-medium">Flew away at {currentMultiplier.toFixed(2)}x</span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <p className="text-xs text-zinc-400 mb-3.5 leading-relaxed">
+              Manually lock the crash point. You can set it to fly to <strong>5.00x</strong>, <strong>10.00x</strong>, <strong>100.00x</strong> or any custom target. In <em>Always Lock</em> mode, every upcoming round will fly to your chosen multiplier until cancelled.
             </p>
 
-            <form onSubmit={handleSetMultiplier} className="flex gap-2 items-end">
-              <div className="flex-1">
-                <label className="text-[10px] uppercase tracking-wider font-semibold text-zinc-400 block mb-1">
-                  Next Crash Multiplier (e.g., 2.50, 100.00)
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="1.01"
-                    placeholder="Auto-generate"
-                    value={customMultiplierInput}
-                    onChange={(e) => setCustomMultiplierInput(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 focus:border-purple-500 rounded-lg px-3 py-2 text-sm text-white font-mono placeholder-zinc-700 outline-none"
-                  />
-                  <span className="absolute right-3 top-2 text-zinc-500 text-xs">x</span>
+            {/* Injection Duration Mode: Always Lock vs Single Round */}
+            <div className="mb-4 bg-zinc-950 p-2 border border-zinc-850 rounded-xl">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] uppercase tracking-wider font-bold text-zinc-400 px-1">
+                  Locking Duration:
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMultiplierMode('persistent');
+                      if (forcedMultiplier !== null) {
+                        onSetForcedMultiplier(forcedMultiplier, 'persistent');
+                      }
+                    }}
+                    className={`px-3 py-1 text-[11px] font-bold rounded-lg transition cursor-pointer flex items-center gap-1 ${
+                      multiplierMode === 'persistent'
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200'
+                    }`}
+                  >
+                    <span>🔄 Always Lock (लगातार यही उड़ेगा)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMultiplierMode('single');
+                      if (forcedMultiplier !== null) {
+                        onSetForcedMultiplier(forcedMultiplier, 'single');
+                      }
+                    }}
+                    className={`px-3 py-1 text-[11px] font-bold rounded-lg transition cursor-pointer flex items-center gap-1 ${
+                      multiplierMode === 'single'
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200'
+                    }`}
+                  >
+                    <span>🎯 Next 1 Round Only</span>
+                  </button>
                 </div>
               </div>
-              <button
-                type="submit"
-                className="bg-purple-600 hover:bg-purple-500 text-white font-medium text-xs px-4 py-2.5 rounded-lg flex items-center gap-1.5 transition duration-150 active:scale-95 cursor-pointer"
-              >
-                <Play className="w-3.5 h-3.5" />
-                Inject Multiplier
-              </button>
+            </div>
+
+            {/* 1-Click Quick Preset Buttons (Includes 5x!) */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-1.5 px-0.5">
+                <label className="text-[10px] uppercase tracking-wider font-bold text-purple-300">
+                  Quick Inject Multiplier Presets:
+                </label>
+                <span className="text-[10px] text-zinc-500">Tap to inject immediately</span>
+              </div>
+              <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-1.5">
+                {QUICK_MULTIPLIER_PRESETS.map((preset) => {
+                  const isSelected = forcedMultiplier === preset;
+                  return (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => handleQuickInject(preset, false)}
+                      className={`py-2 px-1 rounded-xl font-mono text-xs font-bold transition duration-150 flex flex-col items-center justify-center cursor-pointer border active:scale-95 ${
+                        isSelected
+                          ? 'bg-purple-600 border-purple-400 text-white shadow-lg shadow-purple-600/30 scale-105 ring-2 ring-purple-400/50'
+                          : preset === 5.0
+                          ? 'bg-amber-950/40 hover:bg-amber-900/60 border-amber-600/50 text-amber-300 hover:text-white'
+                          : 'bg-zinc-950 hover:bg-zinc-800 border-zinc-800 text-zinc-300 hover:text-white'
+                      }`}
+                      title={`Inject ${preset.toFixed(2)}x`}
+                      id={`preset_multiplier_${preset.toString().replace('.', '_')}`}
+                    >
+                      <span>{preset >= 10 ? `${preset}x` : `${preset.toFixed(2)}x`}</span>
+                      {isSelected && (
+                        <span className="text-[8px] uppercase tracking-tighter text-purple-200 mt-0.5 font-sans">
+                          ACTIVE
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Custom Multiplier Form with Two Direct Action Buttons */}
+            <form onSubmit={(e) => handleSetMultiplier(e, false)} className="space-y-3">
+              <div>
+                <label className="text-[10px] uppercase tracking-wider font-semibold text-zinc-400 block mb-1">
+                  Custom Multiplier Target (Type number, e.g. 5, 5.00, or 25):
+                </label>
+                <div className="flex gap-2 items-center">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="e.g. 5.00 or 15"
+                      value={customMultiplierInput}
+                      onChange={(e) => setCustomMultiplierInput(e.target.value)}
+                      className="w-full bg-zinc-950 border border-zinc-800 focus:border-purple-500 rounded-xl px-3.5 py-2 text-sm text-white font-mono placeholder-zinc-700 outline-none"
+                      id="custom_multiplier_input"
+                    />
+                    <span className="absolute right-3 top-2 text-zinc-500 text-xs font-mono font-bold">x</span>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-md shadow-purple-950/50 shrink-0"
+                    id="inject_multiplier_btn"
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    <span>Inject Multiplier</span>
+                  </button>
+
+                  {onBackToGame && (
+                    <button
+                      type="button"
+                      onClick={() => handleSetMultiplier(undefined, true)}
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-md shadow-emerald-950/50 shrink-0"
+                      title="Inject and return to live game immediately"
+                      id="inject_and_go_to_game_btn"
+                    >
+                      <Play className="w-3.5 h-3.5 fill-current" />
+                      <span>Inject & Go to Game</span>
+                    </button>
+                  )}
+                </div>
+              </div>
             </form>
 
+            {/* Active Lock Status Bar */}
             {forcedMultiplier !== null ? (
-              <div className="mt-4 p-3 bg-amber-950/20 border border-amber-800/40 rounded-xl flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping" />
-                  <p className="text-xs text-amber-200">
-                    Next round locked at <span className="font-mono font-bold text-amber-400 text-sm">{forcedMultiplier.toFixed(2)}x</span>
-                  </p>
+              <div className="mt-4 p-3.5 bg-gradient-to-r from-amber-950/40 via-purple-950/30 to-zinc-950 border border-amber-700/60 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fade-in" id="active_multiplier_banner">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-3 h-3 rounded-full bg-amber-400 animate-ping shrink-0" />
+                  <div>
+                    <p className="text-xs text-amber-200">
+                      Multiplier Target Locked: <strong className="font-mono font-black text-amber-300 text-base">{forcedMultiplier.toFixed(2)}x</strong>
+                    </p>
+                    <p className="text-[10px] text-amber-400/80">
+                      {multiplierMode === 'persistent' ? '🔄 Every round will fly to this multiplier.' : '🎯 Applies to current/next round.'}
+                    </p>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleClearForcedMultiplier}
-                  className="text-[11px] text-zinc-400 hover:text-white underline cursor-pointer"
-                >
-                  Cancel Override
-                </button>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {onBackToGame && (
+                    <button
+                      type="button"
+                      onClick={onBackToGame}
+                      className="px-3 py-1 bg-emerald-600/30 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 rounded-lg text-xs font-bold transition cursor-pointer"
+                    >
+                      ✈️ View in Game
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleClearForcedMultiplier}
+                    className="px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-red-400 border border-zinc-800 rounded-lg text-xs font-bold transition cursor-pointer"
+                    id="cancel_forced_multiplier_btn"
+                  >
+                    Cancel Override (हटाएं)
+                  </button>
+                </div>
               </div>
             ) : (
-              <p className="mt-3 text-[11px] text-emerald-400 font-mono flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5" />
-                Fair Server Seed RNG Active
-              </p>
+              <div className="mt-3.5 p-2.5 bg-zinc-950 border border-zinc-850 rounded-xl flex items-center justify-between text-[11px] text-emerald-400 font-mono">
+                <div className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-400" />
+                  <span>Provably Fair Server Seed Active (Natural random flight curve)</span>
+                </div>
+                <span className="text-[10px] text-zinc-500">RNG Mode</span>
+              </div>
             )}
           </div>
 
