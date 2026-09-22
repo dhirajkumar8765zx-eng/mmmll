@@ -30,6 +30,7 @@ import AdminPanel from './components/AdminPanel';
 import DepositModal from './components/DepositModal';
 import WithdrawModal from './components/WithdrawModal';
 import AuthModal from './components/AuthModal';
+import AdminAccessModal from './components/AdminAccessModal';
 import TelegramSupportModal, { TELEGRAM_SUPPORT_ID } from './components/TelegramSupportModal';
 import {
   HowToPlayModal,
@@ -203,7 +204,71 @@ export default function App() {
   });
 
   // --- Session & UI States ---
-  const [activeView, setActiveView] = useState<'game' | 'admin'>('game');
+  const [activeView, setActiveView] = useState<'game' | 'admin'>(() => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash.toLowerCase();
+      const search = window.location.search.toLowerCase();
+      const isRouteAdmin = hash.includes('admin') || search.includes('admin');
+      if (isRouteAdmin && sessionStorage.getItem('aviator_admin_auth') === 'true') {
+        return 'admin';
+      }
+    }
+    return 'game';
+  });
+  const [adminAccessModalOpen, setAdminAccessModalOpen] = useState(false);
+
+  useEffect(() => {
+    const handleUrlCheck = () => {
+      const hash = window.location.hash.toLowerCase();
+      const search = window.location.search.toLowerCase();
+      const isRouteAdmin = hash.includes('admin') || search.includes('admin');
+      if (isRouteAdmin) {
+        if (sessionStorage.getItem('aviator_admin_auth') === 'true') {
+          setActiveView('admin');
+        } else {
+          setAdminAccessModalOpen(true);
+        }
+      } else {
+        setActiveView('game');
+      }
+    };
+
+    window.addEventListener('hashchange', handleUrlCheck);
+    return () => window.removeEventListener('hashchange', handleUrlCheck);
+  }, []);
+
+  const handleRequestAdminAccess = () => {
+    if (sessionStorage.getItem('aviator_admin_auth') === 'true') {
+      setActiveView('admin');
+      window.location.hash = 'admin';
+    } else {
+      setAdminAccessModalOpen(true);
+    }
+  };
+
+  const handleAdminAuthSuccess = () => {
+    setAdminAccessModalOpen(false);
+    setActiveView('admin');
+    window.location.hash = 'admin';
+    showToast('Operator authorization verified. Welcome to Admin Terminal.', 'success');
+  };
+
+  const handleBackToGame = () => {
+    setActiveView('game');
+    if (window.location.hash.includes('admin')) {
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  };
+
+  const handleLogoutAdmin = () => {
+    sessionStorage.removeItem('aviator_admin_auth');
+    setActiveView('game');
+    if (window.location.hash.includes('admin')) {
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+    showToast('Operator session locked.', 'info');
+  };
+
   const [mobileTab, setMobileTab] = useState<'game' | 'live' | 'history'>('game');
   const [sideMenuOpen, setSideMenuOpen] = useState(false);
   const [depositModalOpen, setDepositModalOpen] = useState(false);
@@ -997,6 +1062,62 @@ export default function App() {
     showToast('Stats wiped out. Player wallet balance reset to ₹0.', 'success');
   };
 
+  // --- Dedicated Standalone Operator Terminal Section ---
+  if (activeView === 'admin') {
+    return (
+      <div className="min-h-screen bg-zinc-950 font-sans text-gray-200 antialiased p-3 sm:p-6 relative overflow-x-hidden" id="admin_portal_section">
+        {/* Subtle operator background glow */}
+        <div className="absolute top-[-10%] right-[-10%] w-[50vw] h-[50vw] rounded-full bg-purple-600/5 blur-[120px] pointer-events-none" />
+
+        <AdminPanel
+          settings={settings}
+          stats={stats}
+          balance={balance}
+          deposits={deposits}
+          withdrawals={withdrawals}
+          pastRounds={recentMultipliers}
+          forcedMultiplier={forcedMultiplier}
+          onUpdateSettings={(newSettings) => setSettings((s) => ({ ...s, ...newSettings }))}
+          onApproveDeposit={handleApproveDeposit}
+          onRejectDeposit={handleRejectDeposit}
+          onApproveAllDeposits={handleApproveAllDeposits}
+          onApproveWithdrawal={handleApproveWithdrawal}
+          onRejectWithdrawal={handleRejectWithdrawal}
+          onApproveAllWithdrawals={handleApproveAllWithdrawals}
+          onSetForcedMultiplier={setForcedMultiplier}
+          onResetStats={handleResetStats}
+          onPurgeAllDemoData={handlePurgeAllDemoData}
+          onAdjustBalance={handleAdjustBalance}
+          onBackToGame={handleBackToGame}
+          onLogoutAdmin={handleLogoutAdmin}
+        />
+
+        {/* Global Toast for notifications in Admin view */}
+        {toast && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-fade-in" id="admin_toast_notification">
+            <div className={`px-4 py-3 rounded-2xl shadow-2xl border flex items-center gap-3 text-white backdrop-blur-xl ${
+              toast.type === 'success' ? 'bg-emerald-950/90 border-emerald-500/50 text-emerald-100' :
+              toast.type === 'error' ? 'bg-red-950/90 border-red-500/50 text-red-100' :
+              'bg-zinc-900/90 border-zinc-700 text-zinc-100'
+            }`}>
+              {toast.type === 'success' && <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0" />}
+              {toast.type === 'error' && <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />}
+              {toast.type === 'info' && <Sparkles className="w-5 h-5 text-zinc-400 shrink-0" />}
+              <span className="text-xs font-bold leading-normal">{toast.message}</span>
+              <button 
+                onClick={() => setToast(null)}
+                className="p-1 rounded bg-black/20 hover:bg-black/40 text-zinc-400 hover:text-white transition cursor-pointer shrink-0"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // --- Authentic Clean Aviator Game View (Zero Admin Clutter) ---
   return (
     <div className="min-h-screen bg-zinc-950 font-sans text-gray-200 antialiased relative overflow-x-hidden flex flex-col justify-between" id="app_frame">
       
@@ -1004,18 +1125,18 @@ export default function App() {
       <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-red-600/5 blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] rounded-full bg-purple-600/5 blur-[120px] pointer-events-none" />
 
-      {/* Primary Top Header Navigation Bar (Matches user reference photo) */}
+      {/* Primary Top Header Navigation Bar (Clean Player UI, No Admin Icons) */}
       <header className="sticky top-0 z-30 border-b border-zinc-900 bg-zinc-950/95 backdrop-blur-md px-2.5 sm:px-4 py-2" id="top_navbar">
         <div className="max-w-7xl mx-auto space-y-1.5">
-          {/* Row 1: Back Button, Blue Balance Pill with Gold Coin, Add Button, Avatar, Admin Toggle */}
+          {/* Row 1: Back Button, Withdraw Button, Live Telegram Support, Deposit Button, Avatar/Login */}
           <div className="flex items-center justify-between gap-2">
-            {/* Left: Back Chevron */}
+            {/* Left: Back Chevron & Action Pills */}
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => { setActiveView('game'); setMobileTab('game'); }}
                 className="w-8 h-8 rounded-full bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center justify-center transition active:scale-95 cursor-pointer border border-zinc-800"
-                title="Back to Game"
+                title="Refresh Game"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
@@ -1048,7 +1169,7 @@ export default function App() {
               </button>
             </div>
 
-            {/* Right: Plus Box + Avatar + Admin Toggle */}
+            {/* Right: Deposit + User Profile (No Admin Toggle here!) */}
             <div className="flex items-center gap-2">
               {/* Deposit Button */}
               <button
@@ -1091,31 +1212,6 @@ export default function App() {
                   <span>Login</span>
                 </button>
               )}
-
-              {/* Admin Panel Toggle Button */}
-              {(() => {
-                const pendingCount = deposits.filter((d) => d.status === 'pending').length + withdrawals.filter((w) => w.status === 'pending').length;
-                return (
-                  <button
-                    type="button"
-                    onClick={() => setActiveView(activeView === 'game' ? 'admin' : 'game')}
-                    className={`relative p-1.5 rounded-lg border text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
-                      activeView === 'admin' 
-                        ? 'bg-purple-900/50 border-purple-600 text-purple-300' 
-                        : 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-400 hover:text-white'
-                    }`}
-                    title={pendingCount > 0 ? `${pendingCount} Pending Customer Requests` : "Admin Settings"}
-                    id="admin_panel_toggle_btn"
-                  >
-                    <Settings className="w-3.5 h-3.5" />
-                    {pendingCount > 0 && (
-                      <span className="absolute -top-1.5 -right-1.5 min-w-[17px] h-[17px] px-1 bg-red-600 border border-zinc-950 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow-lg animate-pulse">
-                        {pendingCount}
-                      </span>
-                    )}
-                  </button>
-                );
-              })()}
             </div>
           </div>
 
@@ -1150,63 +1246,52 @@ export default function App() {
         </div>
       </header>
 
-      {/* Primary Main Content Area */}
+      {/* Primary Main Content Area: Pure Aviator Game */}
       <main className="flex-grow w-full max-w-7xl mx-auto px-2 sm:px-4 py-2 sm:py-4 flex flex-col justify-center pb-8" id="primary_main_content">
-        
-        {activeView === 'admin' ? (
-          /* Admin configuration Panel view */
-          <AdminPanel
-            settings={settings}
-            stats={stats}
+        <div className="w-full max-w-lg mx-auto space-y-2.5 sm:space-y-3 animate-fade-in" id="spribe_main_game_wrapper">
+          
+          {/* Flight Arena & Dual Betting Panels (with Bet / Cash Out buttons) */}
+          <AviatorGame
             balance={balance}
-            deposits={deposits}
-            withdrawals={withdrawals}
-            pastRounds={recentMultipliers}
-            forcedMultiplier={forcedMultiplier}
-            onUpdateSettings={(newSettings) => setSettings((s) => ({ ...s, ...newSettings }))}
-            onApproveDeposit={handleApproveDeposit}
-            onRejectDeposit={handleRejectDeposit}
-            onApproveAllDeposits={handleApproveAllDeposits}
-            onApproveWithdrawal={handleApproveWithdrawal}
-            onRejectWithdrawal={handleRejectWithdrawal}
-            onApproveAllWithdrawals={handleApproveAllWithdrawals}
-            onSetForcedMultiplier={setForcedMultiplier}
-            onResetStats={handleResetStats}
-            onPurgeAllDemoData={handlePurgeAllDemoData}
-            onAdjustBalance={handleAdjustBalance}
+            gameState={gameState}
+            multiplier={multiplier}
+            countdown={countdown}
+            recentMultipliers={recentMultipliers}
+            activeBets={activeBets}
+            liveBetsCount={livePlayers.length + activeBets.filter((b) => b.status === 'placed' || b.status === 'queued').length}
+            onPlaceBet={handlePlaceBet}
+            onCancelBet={handleCancelBet}
+            onCashOut={handleCashOut}
           />
-        ) : (
-          /* Actual Aviator Game view - Centered mobile layout matching reference screenshot */
-          <div className="w-full max-w-lg mx-auto space-y-2.5 sm:space-y-3 animate-fade-in" id="spribe_main_game_wrapper">
-            
-            {/* Flight Arena & Dual Betting Panels (with Bet / Cash Out buttons) */}
-            <AviatorGame
-              balance={balance}
-              gameState={gameState}
-              multiplier={multiplier}
-              countdown={countdown}
-              recentMultipliers={recentMultipliers}
-              activeBets={activeBets}
-              liveBetsCount={livePlayers.length + activeBets.filter((b) => b.status === 'placed' || b.status === 'queued').length}
-              onPlaceBet={handlePlaceBet}
-              onCancelBet={handleCancelBet}
-              onCashOut={handleCashOut}
-            />
 
-            {/* Authentic Spribe Bets Section: Placed DIRECTLY UNDER the Bet panel! */}
-            <SpribeBetsList
-              gameState={gameState}
-              multiplier={multiplier}
-              livePlayers={livePlayers}
-              userActiveBets={activeBets}
-              userBetHistory={userBetHistory}
-              pastRounds={recentMultipliers}
-              totalBettingUsers={totalBettingUsers}
-            />
-          </div>
-        )}
-
+          {/* Authentic Spribe Bets Section: Placed DIRECTLY UNDER the Bet panel! */}
+          <SpribeBetsList
+            gameState={gameState}
+            multiplier={multiplier}
+            livePlayers={livePlayers}
+            userActiveBets={activeBets}
+            userBetHistory={userBetHistory}
+            pastRounds={recentMultipliers}
+            totalBettingUsers={totalBettingUsers}
+          />
+        </div>
       </main>
+
+      {/* Game Subtle Footer with Discrete Operator Portal Access */}
+      <footer className="w-full text-center py-3 border-t border-zinc-900/60 text-zinc-600 text-[11px] font-mono mt-auto" id="game_footer_bar">
+        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-zinc-600">
+          <span>© 2026 Aviator 100x • Provably Fair Certified</span>
+          <button
+            type="button"
+            onClick={handleRequestAdminAccess}
+            className="text-[10px] text-zinc-700 hover:text-zinc-500 transition cursor-pointer underline-offset-2 hover:underline"
+            id="footer_operator_portal_link"
+            title="Operator Management"
+          >
+            Operator Portal
+          </button>
+        </div>
+      </footer>
 
       {/* Overlay Drawer Menu */}
       <SideMenu
@@ -1223,6 +1308,14 @@ export default function App() {
         onSwitchView={setActiveView}
         activeView={activeView}
         onOpenTelegramSupport={() => setTelegramSupportOpen(true)}
+        onOpenAdminAccess={handleRequestAdminAccess}
+      />
+
+      {/* Operator Access PIN Modal */}
+      <AdminAccessModal
+        isOpen={adminAccessModalOpen}
+        onClose={() => setAdminAccessModalOpen(false)}
+        onSuccess={handleAdminAuthSuccess}
       />
 
       {/* User Authentication Modal (Login & Sign Up) */}

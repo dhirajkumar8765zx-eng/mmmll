@@ -33,6 +33,7 @@ interface SideMenuProps {
   onSwitchView: (view: 'game' | 'admin') => void;
   activeView: 'game' | 'admin';
   onOpenTelegramSupport?: () => void;
+  onOpenAdminAccess?: () => void;
 }
 
 export default function SideMenu({
@@ -48,7 +49,8 @@ export default function SideMenu({
   onOpenModal,
   onSwitchView,
   activeView,
-  onOpenTelegramSupport
+  onOpenTelegramSupport,
+  onOpenAdminAccess
 }: SideMenuProps) {
   const [showHistory, setShowHistory] = useState(false);
 
@@ -351,7 +353,18 @@ export default function SideMenu({
 
         {/* Footer info */}
         <div className="p-4 bg-zinc-900 border-t border-zinc-850 text-center space-y-1">
-          <p className="text-[10px] font-mono text-zinc-600">Aviator 100x • Version 1.0.4</p>
+          <button
+            type="button"
+            onClick={() => {
+              if (onOpenAdminAccess) onOpenAdminAccess();
+              onClose();
+            }}
+            className="text-[10px] font-mono text-zinc-600 hover:text-zinc-400 transition cursor-pointer"
+            title="Operator Management Portal"
+            id="sidemenu_operator_portal_link"
+          >
+            Aviator 100x • Version 1.0.4
+          </button>
           <p className="text-[9px] text-zinc-700 leading-tight">
             Certified secure Provably Fair system. Responsible playing only.
           </p>

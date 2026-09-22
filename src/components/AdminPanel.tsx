@@ -21,7 +21,11 @@ import {
   Clock,
   Wallet,
   Edit3,
-  Plus
+  Plus,
+  ArrowLeft,
+  LogOut,
+  Gamepad2,
+  AlertTriangle
 } from 'lucide-react';
 import { DepositRequest, GameSettings, GameStats, PastRound, WithdrawRequest } from '../types';
 
@@ -44,6 +48,8 @@ interface AdminPanelProps {
   onSetForcedMultiplier: (multiplier: number | null) => void;
   onResetStats: () => void;
   onAdjustBalance?: (newBalance: number) => void;
+  onBackToGame?: () => void;
+  onLogoutAdmin?: () => void;
 }
 
 function AdminPanel({
@@ -64,7 +70,9 @@ function AdminPanel({
   onPurgeAllDemoData,
   onSetForcedMultiplier,
   onResetStats,
-  onAdjustBalance
+  onAdjustBalance,
+  onBackToGame,
+  onLogoutAdmin
 }: AdminPanelProps) {
   const [editingBalance, setEditingBalance] = useState(false);
   const [balanceInput, setBalanceInput] = useState((balance ?? 0).toString());
@@ -80,18 +88,24 @@ function AdminPanel({
   const [depositFilter, setDepositFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [withdrawFilter, setWithdrawFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [proofModalUrl, setProofModalUrl] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ msg: string; type: 'success' | 'info' | 'error' } | null>(null);
+
+  const notify = (msg: string, type: 'success' | 'info' | 'error' = 'success') => {
+    setNotice({ msg, type });
+    setTimeout(() => setNotice(null), 4000);
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file (PNG, JPG, or WEBP).');
+      notify('Please select an image file (PNG, JPG, or WEBP).', 'error');
       return;
     }
 
     if (file.size > 2 * 1024 * 1024) {
-      alert('File is too large! Please upload a QR code image under 2MB.');
+      notify('File is too large! Please upload a QR code image under 2MB.', 'error');
       return;
     }
 
@@ -100,7 +114,7 @@ function AdminPanel({
       const base64 = event.target?.result as string;
       if (base64) {
         setQrUrlInput(base64);
-        alert('QR code image uploaded successfully as Base64 format! Click "Save Gateway Credentials" below to save.');
+        notify('QR code image uploaded! Click "Save Gateway Credentials" to apply.', 'success');
       }
     };
     reader.readAsDataURL(file);
@@ -108,7 +122,7 @@ function AdminPanel({
 
   const handleClearUploadedQR = () => {
     setQrUrlInput('');
-    alert('Custom QR cleared. It will now generate UPI QR codes dynamically using your Active UPI ID.');
+    notify('Custom QR cleared. Dynamic UPI QR codes are now active.', 'info');
   };
 
   const handleSavePayment = (e: React.FormEvent) => {
@@ -119,24 +133,24 @@ function AdminPanel({
       telegramSupportId: telegramSupportInput.trim() || '@lottaygent',
       instantApproval: instantApprovalInput
     });
-    alert('Payment gateway, instant processing, and support configurations updated!');
+    notify('Payment gateway, instant processing, and support configurations updated!', 'success');
   };
 
   const handleSetMultiplier = (e: React.FormEvent) => {
     e.preventDefault();
     const val = parseFloat(customMultiplierInput);
     if (isNaN(val) || val < 1.0) {
-      alert('Please enter a valid multiplier >= 1.0');
+      notify('Please enter a valid multiplier >= 1.0', 'error');
       return;
     }
     onSetForcedMultiplier(val);
     setCustomMultiplierInput('');
-    alert(`Success! Next round forced to fly away at ${val.toFixed(2)}x`);
+    notify(`Success! Next round forced to fly away at ${val.toFixed(2)}x`, 'success');
   };
 
   const handleClearForcedMultiplier = () => {
     onSetForcedMultiplier(null);
-    alert('Forced multiplier removed. Random generator active.');
+    notify('Forced multiplier removed. Random generator active.', 'info');
   };
 
   const handleSaveLimits = (e: React.FormEvent) => {
@@ -145,27 +159,77 @@ function AdminPanel({
       minBet: Number(minBetInput),
       maxBet: Number(maxBetInput)
     });
-    alert('Betting thresholds updated!');
+    notify('Betting thresholds updated!', 'success');
   };
 
   return (
-    <div className="space-y-6 text-gray-100" id="admin_panel_container">
-      {/* Header section */}
-      <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
+    <div className="space-y-6 text-gray-100 max-w-7xl mx-auto pb-12" id="admin_panel_container">
+      {/* Dedicated Operator Terminal Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-4">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-            <Settings className="w-5 h-5 text-purple-400" />
-            Aviator 100x Operator Terminal
-          </h2>
-          <p className="text-xs text-zinc-400 mt-1">
-            Real-time server administration panel, game configuration, and deposit reconciliation.
-          </p>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-purple-600/20 border border-purple-500/40 flex items-center justify-center text-purple-400">
+              <Settings className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-lg sm:text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                Aviator 100x Operator Terminal
+              </h2>
+              <p className="text-[11px] text-zinc-400">
+                Isolated management section: player transactions, UPI gateway, game loop & provably fair
+              </p>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1 bg-purple-950/40 border border-purple-800/60 rounded-full">
-          <ShieldCheck className="w-4 h-4 text-purple-400" />
-          <span className="text-xs font-mono font-medium text-purple-300">ADMIN ACTIVE</span>
+
+        {/* Top Action Controls: Status, Back to Game, Logout */}
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-950/40 border border-purple-800/60 rounded-xl">
+            <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+            <span className="text-[11px] font-mono font-bold text-purple-300">OPERATOR ACTIVE</span>
+          </div>
+
+          {onBackToGame && (
+            <button
+              type="button"
+              onClick={onBackToGame}
+              className="bg-red-600 hover:bg-red-500 text-white font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-lg shadow-red-950/50 transition active:scale-95 cursor-pointer"
+              id="admin_back_to_game_btn"
+              title="Return to Aviator Game Arena"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back to Game</span>
+            </button>
+          )}
+
+          {onLogoutAdmin && (
+            <button
+              type="button"
+              onClick={onLogoutAdmin}
+              className="bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
+              title="Lock Admin Session"
+              id="admin_lock_session_btn"
+            >
+              <LogOut className="w-3.5 h-3.5 text-zinc-400" />
+              <span className="hidden sm:inline">Lock Session</span>
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Inline Notification Banner */}
+      {notice && (
+        <div className={`p-3 rounded-xl border text-xs font-bold flex items-center gap-2 animate-fade-in ${
+          notice.type === 'error'
+            ? 'bg-red-950/60 border-red-500/40 text-red-300'
+            : notice.type === 'info'
+            ? 'bg-blue-950/60 border-blue-500/40 text-blue-300'
+            : 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300'
+        }`}>
+          <span>{notice.type === 'error' ? '⚠️' : '✅'}</span>
+          <span>{notice.msg}</span>
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
