@@ -30,8 +30,8 @@ interface SideMenuProps {
   onToggleMusic: () => void;
   onToggleAnimation: () => void;
   onOpenModal: (modalType: 'how_to_play' | 'rules' | 'limits' | 'free_bets' | 'provably_fair') => void;
-  onSwitchView: (view: 'game' | 'admin') => void;
-  activeView: 'game' | 'admin';
+  onSwitchView?: (view: 'game' | 'admin') => void;
+  activeView?: 'game' | 'admin';
   onOpenTelegramSupport?: () => void;
   onOpenAdminAccess?: () => void;
 }
@@ -47,10 +47,7 @@ export default function SideMenu({
   onToggleMusic,
   onToggleAnimation,
   onOpenModal,
-  onSwitchView,
-  activeView,
-  onOpenTelegramSupport,
-  onOpenAdminAccess
+  onOpenTelegramSupport
 }: SideMenuProps) {
   const [showHistory, setShowHistory] = useState(false);
 
@@ -172,27 +169,6 @@ export default function SideMenu({
                 <span>Copy ID</span>
               </button>
             </div>
-          </div>
-
-          {/* Quick Access Admin Console */}
-          <div className="p-3 bg-gradient-to-r from-purple-950/40 to-pink-950/20 border border-purple-900/30 rounded-xl space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-purple-400 uppercase tracking-widest">SYSTEM MANAGEMENT</span>
-              <span className="text-[9px] font-mono font-bold bg-purple-500/10 text-purple-300 border border-purple-500/20 px-1.5 py-0.2 rounded-full">OPERATOR</span>
-            </div>
-            <p className="text-[11px] text-zinc-400 leading-relaxed">
-              Access the payment gateway ledger, force RNG multipliers, and view total margins.
-            </p>
-            <button
-              onClick={() => {
-                onSwitchView(activeView === 'admin' ? 'game' : 'admin');
-                onClose();
-              }}
-              className="w-full mt-1.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer"
-            >
-              <Settings className="w-3.5 h-3.5" />
-              {activeView === 'admin' ? 'Back to Game Board' : 'Open Admin Panel'}
-            </button>
           </div>
 
           {/* Quick Settings Group */}
@@ -353,18 +329,7 @@ export default function SideMenu({
 
         {/* Footer info */}
         <div className="p-4 bg-zinc-900 border-t border-zinc-850 text-center space-y-1">
-          <button
-            type="button"
-            onClick={() => {
-              if (onOpenAdminAccess) onOpenAdminAccess();
-              onClose();
-            }}
-            className="text-[10px] font-mono text-zinc-600 hover:text-zinc-400 transition cursor-pointer"
-            title="Operator Management Portal"
-            id="sidemenu_operator_portal_link"
-          >
-            Aviator 100x • Version 1.0.4
-          </button>
+          <p className="text-[10px] font-mono text-zinc-600">Aviator 100x • Version 1.0.4</p>
           <p className="text-[9px] text-zinc-700 leading-tight">
             Certified secure Provably Fair system. Responsible playing only.
           </p>

@@ -204,14 +204,22 @@ export default function App() {
   });
 
   // --- Session & UI States ---
+  const checkIsAdminRoute = () => {
+    if (typeof window === 'undefined') return false;
+    const hash = window.location.hash.toLowerCase();
+    const search = window.location.search.toLowerCase();
+    const pathname = window.location.pathname.toLowerCase();
+    return (
+      hash.includes('admin') ||
+      search.includes('admin') ||
+      pathname.endsWith('/admin') ||
+      pathname.includes('/admin/')
+    );
+  };
+
   const [activeView, setActiveView] = useState<'game' | 'admin'>(() => {
-    if (typeof window !== 'undefined') {
-      const hash = window.location.hash.toLowerCase();
-      const search = window.location.search.toLowerCase();
-      const isRouteAdmin = hash.includes('admin') || search.includes('admin');
-      if (isRouteAdmin && sessionStorage.getItem('aviator_admin_auth') === 'true') {
-        return 'admin';
-      }
+    if (checkIsAdminRoute() && sessionStorage.getItem('aviator_admin_auth') === 'true') {
+      return 'admin';
     }
     return 'game';
   });
@@ -219,9 +227,7 @@ export default function App() {
 
   useEffect(() => {
     const handleUrlCheck = () => {
-      const hash = window.location.hash.toLowerCase();
-      const search = window.location.search.toLowerCase();
-      const isRouteAdmin = hash.includes('admin') || search.includes('admin');
+      const isRouteAdmin = checkIsAdminRoute();
       if (isRouteAdmin) {
         if (sessionStorage.getItem('aviator_admin_auth') === 'true') {
           setActiveView('admin');
@@ -233,30 +239,31 @@ export default function App() {
       }
     };
 
+    handleUrlCheck();
     window.addEventListener('hashchange', handleUrlCheck);
-    return () => window.removeEventListener('hashchange', handleUrlCheck);
+    window.addEventListener('popstate', handleUrlCheck);
+    return () => {
+      window.removeEventListener('hashchange', handleUrlCheck);
+      window.removeEventListener('popstate', handleUrlCheck);
+    };
   }, []);
-
-  const handleRequestAdminAccess = () => {
-    if (sessionStorage.getItem('aviator_admin_auth') === 'true') {
-      setActiveView('admin');
-      window.location.hash = 'admin';
-    } else {
-      setAdminAccessModalOpen(true);
-    }
-  };
 
   const handleAdminAuthSuccess = () => {
     setAdminAccessModalOpen(false);
     setActiveView('admin');
-    window.location.hash = 'admin';
+    if (!checkIsAdminRoute()) {
+      window.location.hash = 'admin';
+    }
     showToast('Operator authorization verified. Welcome to Admin Terminal.', 'success');
   };
 
   const handleBackToGame = () => {
     setActiveView('game');
     if (window.location.hash.includes('admin')) {
-      history.replaceState(null, '', window.location.pathname + window.location.search);
+      window.location.hash = '';
+    }
+    if (window.location.search.includes('admin') || window.location.pathname.includes('admin')) {
+      history.replaceState(null, '', '/');
     }
   };
 
@@ -264,7 +271,10 @@ export default function App() {
     sessionStorage.removeItem('aviator_admin_auth');
     setActiveView('game');
     if (window.location.hash.includes('admin')) {
-      history.replaceState(null, '', window.location.pathname + window.location.search);
+      window.location.hash = '';
+    }
+    if (window.location.search.includes('admin') || window.location.pathname.includes('admin')) {
+      history.replaceState(null, '', '/');
     }
     showToast('Operator session locked.', 'info');
   };
@@ -1277,19 +1287,10 @@ export default function App() {
         </div>
       </main>
 
-      {/* Game Subtle Footer with Discrete Operator Portal Access */}
+      {/* Game Clean Footer (No admin controls) */}
       <footer className="w-full text-center py-3 border-t border-zinc-900/60 text-zinc-600 text-[11px] font-mono mt-auto" id="game_footer_bar">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-zinc-600">
-          <span>© 2026 Aviator 100x • Provably Fair Certified</span>
-          <button
-            type="button"
-            onClick={handleRequestAdminAccess}
-            className="text-[10px] text-zinc-700 hover:text-zinc-500 transition cursor-pointer underline-offset-2 hover:underline"
-            id="footer_operator_portal_link"
-            title="Operator Management"
-          >
-            Operator Portal
-          </button>
+        <div className="max-w-7xl mx-auto px-4 flex items-center justify-center text-zinc-600">
+          <span>© 2026 Aviator 100x • Provably Fair Certified • 18+ Only</span>
         </div>
       </footer>
 
@@ -1305,10 +1306,7 @@ export default function App() {
         onToggleMusic={() => setSettings((s) => ({ ...s, musicEnabled: !s.musicEnabled }))}
         onToggleAnimation={() => setSettings((s) => ({ ...s, animationEnabled: !s.animationEnabled }))}
         onOpenModal={(modal) => setActiveModal(modal)}
-        onSwitchView={setActiveView}
-        activeView={activeView}
         onOpenTelegramSupport={() => setTelegramSupportOpen(true)}
-        onOpenAdminAccess={handleRequestAdminAccess}
       />
 
       {/* Operator Access PIN Modal */}
