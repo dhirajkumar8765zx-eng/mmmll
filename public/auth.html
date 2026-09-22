@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aviator - User Login & Sign Up</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    }
+
+    body {
+      background: radial-gradient(circle at top center, #1b0a0d 0%, #0c0d10 65%, #050608 100%);
+      color: #f3f4f6;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    /* Outer Wrapper & Card */
+    .auth-container {
+      width: 100%;
+      max-width: 420px;
+      background: #121418;
+      border: 1px solid #272a34;
+      border-radius: 20px;
+      padding: 28px 24px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7), 0 0 25px rgba(220, 38, 38, 0.12);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Ambient Glow Behind Container */
+    .auth-container::before {
+      content: "";
+      position: absolute;
+      top: -60px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 220px;
+      height: 120px;
+      background: radial-gradient(circle, rgba(220, 38, 38, 0.35) 0%, rgba(220, 38, 38, 0) 75%);
+      pointer-events: none;
+    }
+
+    /* Aviator Header & Branding */
+    .brand-header {
+      text-align: center;
+      margin-bottom: 24px;
+      position: relative;
+    }
+
+    .brand-logo-wrap {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    /* Authentic Aviator Script Logo */
+    .aviator-logo-text {
+      font-family: "Brush Script MT", cursive, sans-serif;
+      font-size: 38px;
+      font-weight: 900;
+      font-style: italic;
+      color: #e50914;
+      letter-spacing: -0.5px;
+      text-shadow: 0 3px 12px rgba(229, 9, 20, 0.55);
+      line-height: 1;
+    }
+
+    .plane-icon-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, #e50914, #991b1b);
+      border-radius: 50%;
+      box-shadow: 0 4px 14px rgba(229, 9, 20, 0.4);
+      animation: floatPlane 3s ease-in-out infinite;
+    }
+
+    .plane-icon-badge svg {
+      width: 22px;
+      height: 22px;
+      fill: #ffffff;
+      transform: rotate(-15deg);
+    }
+
+    @keyframes floatPlane {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50% { transform: translateY(-4px) rotate(3deg); }
+    }
+
+    .brand-subtitle {
+      font-size: 13px;
+      color: #9ca3af;
+      margin-top: 4px;
+    }
+
+    /* Form Mode Switcher (Login vs Sign Up Tabs) */
+    .tab-switcher {
+      display: flex;
+      background: #181a20;
+      border: 1px solid #282c37;
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 24px;
+      position: relative;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 10px 14px;
+      background: transparent;
+      border: none;
+      color: #9ca3af;
+      font-size: 14px;
+      font-weight: 700;
+      border-radius: 9px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .tab-btn.active {
+      background: #e50914;
+      color: #ffffff;
+      box-shadow: 0 2px 10px rgba(229, 9, 20, 0.4);
+    }
+
+    .tab-btn:hover:not(.active) {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    /* Forms */
+    .auth-form {
+      display: none;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .auth-form.active {
+      display: flex;
+      animation: fadeIn 0.3s ease forwards;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Form Fields */
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      text-align: left;
+    }
+
+    .input-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #d1d5db;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .input-box-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      background: #181b22;
+      border: 1px solid #2d323f;
+      border-radius: 10px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .input-box-wrapper:focus-within {
+      border-color: #e50914;
+      box-shadow: 0 0 0 3px rgba(229, 9, 20, 0.2);
+    }
+
+    /* Mobile Number with Country Code Prefix */
+    .country-code-pill {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 0 12px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #f3f4f6;
+      border-right: 1px solid #2d323f;
+      user-select: none;
+      height: 44px;
+    }
+
+    .country-code-pill select {
+      background: transparent;
+      border: none;
+      color: #f3f4f6;
+      font-size: 13px;
+      font-weight: 700;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .country-code-pill select option {
+      background: #181b22;
+      color: #ffffff;
+    }
+
+    .custom-input {
+      width: 100%;
+      height: 44px;
+      padding: 0 14px;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .custom-input::placeholder {
+      color: #6b7280;
+    }
+
+    .input-action-btn {
+      background: transparent;
+      border: none;
+      padding: 0 12px;
+      color: #9ca3af;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.15s;
+    }
+
+    .input-action-btn:hover {
+      color: #ffffff;
+    }
+
+    /* Forgot Password & Remember */
+    .form-options-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+
+    .remember-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .remember-label input[type="checkbox"] {
+      accent-color: #e50914;
+      cursor: pointer;
+    }
+
+    .forgot-link {
+      color: #ef4444;
+      text-decoration: none;
+      font-weight: 600;
+      transition: color 0.15s;
+    }
+
+    .forgot-link:hover {
+      color: #f87171;
+      text-decoration: underline;
+    }
+
+    /* Submit Action Button */
+    .submit-btn {
+      width: 100%;
+      height: 46px;
+      background: linear-gradient(135deg, #e50914, #c50711);
+      border: none;
+      border-radius: 11px;
+      color: #ffffff;
+      font-size: 15px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(229, 9, 20, 0.4);
+      transition: transform 0.15s, background 0.2s, box-shadow 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .submit-btn:hover {
+      background: linear-gradient(135deg, #ff1a25, #e50914);
+      box-shadow: 0 6px 20px rgba(229, 9, 20, 0.55);
+    }
+
+    .submit-btn:active {
+      transform: scale(0.98);
+    }
+
+    /* Terms checkbox */
+    .terms-text {
+      font-size: 11px;
+      color: #9ca3af;
+      line-height: 1.4;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .terms-text input[type="checkbox"] {
+      margin-top: 2px;
+      accent-color: #e50914;
+    }
+
+    .terms-text a {
+      color: #e50914;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    /* Switch Bottom Banner */
+    .switch-footer {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 13px;
+      color: #9ca3af;
+      border-top: 1px solid #232732;
+      padding-top: 18px;
+    }
+
+    .toggle-form-btn {
+      background: transparent;
+      border: none;
+      color: #e50914;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      text-decoration: none;
+      margin-left: 4px;
+      transition: color 0.15s;
+    }
+
+    .toggle-form-btn:hover {
+      color: #ff3b45;
+      text-decoration: underline;
+    }
+
+    /* Alert / Message Box */
+    .alert-banner {
+      display: none;
+      padding: 10px 14px;
+      border-radius: 9px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 14px;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .alert-banner.error {
+      display: flex;
+      background: rgba(220, 38, 38, 0.15);
+      border: 1px solid rgba(220, 38, 38, 0.4);
+      color: #fca5a5;
+    }
+
+    .alert-banner.success {
+      display: flex;
+      background: rgba(40, 167, 69, 0.15);
+      border: 1px solid rgba(40, 167, 69, 0.4);
+      color: #86efac;
+    }
+
+    /* Security Assurance Pill */
+    .security-badge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-size: 11px;
+      color: #6b7280;
+      margin-top: 18px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="auth-container" id="auth_container">
+    <!-- Aviator Branding / Logo at Top -->
+    <div class="brand-header">
+      <div class="brand-logo-wrap">
+        <span class="aviator-logo-text">Aviator</span>
+        <div class="plane-icon-badge">
+          <!-- Stylized Red Jet SVG -->
+          <svg viewBox="0 0 24 24">
+            <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+          </svg>
+        </div>
+      </div>
+      <p class="brand-subtitle" id="brand_subtitle">Sign in with your mobile number to play</p>
+    </div>
+
+    <!-- Alert / Toast Banner -->
+    <div class="alert-banner" id="auth_alert"></div>
+
+    <!-- Login / Sign Up Toggle Switcher -->
+    <div class="tab-switcher">
+      <button type="button" class="tab-btn active" id="tab_login_btn" onclick="switchTab('login')">
+        <span>Log In</span>
+      </button>
+      <button type="button" class="tab-btn" id="tab_signup_btn" onclick="switchTab('signup')">
+        <span>Sign Up</span>
+      </button>
+    </div>
+
+    <!-- ==================== LOGIN FORM ==================== -->
+    <form class="auth-form active" id="login_form" onsubmit="handleLogin(event)">
+      <!-- Mobile Number Field -->
+      <div class="input-group">
+        <label class="input-label" for="login_mobile">Mobile Number</label>
+        <div class="input-box-wrapper">
+          <div class="country-code-pill">
+            <span>🇮🇳</span>
+            <select id="login_country_code" aria-label="Country Code">
+              <option value="+91">+91</option>
+              <option value="+1">+1</option>
+              <option value="+44">+44</option>
+              <option value="+971">+971</option>
+              <option value="+880">+880</option>
+            </select>
+          </div>
+          <input
+            type="tel"
+            id="login_mobile"
+            class="custom-input"
+            placeholder="Enter 10-digit mobile"
+            maxlength="10"
+            pattern="[0-9]{10}"
+            required
+            autocomplete="tel"
+          />
+        </div>
+      </div>
+
+      <!-- Password Field with Show/Hide -->
+      <div class="input-group">
+        <label class="input-label" for="login_password">Password</label>
+        <div class="input-box-wrapper">
+          <input
+            type="password"
+            id="login_password"
+            class="custom-input"
+            placeholder="Enter your password"
+            required
+            autocomplete="current-password"
+          />
+          <button
+            type="button"
+            class="input-action-btn"
+            id="toggle_login_pwd"
+            onclick="togglePasswordVisibility('login_password', 'login_pwd_icon')"
+            title="Toggle Password Visibility"
+          >
+            <svg id="login_pwd_icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Remember Me & Forgot Password -->
+      <div class="form-options-row">
+        <label class="remember-label">
+          <input type="checkbox" id="login_remember" checked />
+          <span>Remember me</span>
+        </label>
+        <a href="javascript:void(0)" class="forgot-link" onclick="handleForgotPassword()">Forgot Password?</a>
+      </div>
+
+      <!-- Submit Login Button -->
+      <button type="submit" class="submit-btn" id="login_submit_btn">
+        <span>Log In to Aviator</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+        </svg>
+      </button>
+
+      <!-- Bottom Toggle Link -->
+      <div class="switch-footer">
+        Don't have an account?
+        <button type="button" class="toggle-form-btn" onclick="switchTab('signup')">Sign Up Now</button>
+      </div>
+    </form>
+
+    <!-- ==================== SIGN UP FORM ==================== -->
+    <form class="auth-form" id="signup_form" onsubmit="handleSignUp(event)">
+      <!-- Mobile Number Field -->
+      <div class="input-group">
+        <label class="input-label" for="signup_mobile">Mobile Number</label>
+        <div class="input-box-wrapper">
+          <div class="country-code-pill">
+            <span>🇮🇳</span>
+            <select id="signup_country_code" aria-label="Country Code">
+              <option value="+91">+91</option>
+              <option value="+1">+1</option>
+              <option value="+44">+44</option>
+              <option value="+971">+971</option>
+              <option value="+880">+880</option>
+            </select>
+          </div>
+          <input
+            type="tel"
+            id="signup_mobile"
+            class="custom-input"
+            placeholder="Enter 10-digit mobile"
+            maxlength="10"
+            pattern="[0-9]{10}"
+            required
+            autocomplete="tel"
+          />
+        </div>
+      </div>
+
+      <!-- Create Password Field -->
+      <div class="input-group">
+        <label class="input-label" for="signup_password">Create Password</label>
+        <div class="input-box-wrapper">
+          <input
+            type="password"
+            id="signup_password"
+            class="custom-input"
+            placeholder="Min 6 characters"
+            minlength="6"
+            required
+            autocomplete="new-password"
+          />
+          <button
+            type="button"
+            class="input-action-btn"
+            id="toggle_signup_pwd"
+            onclick="togglePasswordVisibility('signup_password', 'signup_pwd_icon')"
+            title="Toggle Password Visibility"
+          >
+            <svg id="signup_pwd_icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Confirm Password Field -->
+      <div class="input-group">
+        <label class="input-label" for="signup_confirm_password">Confirm Password</label>
+        <div class="input-box-wrapper">
+          <input
+            type="password"
+            id="signup_confirm_password"
+            class="custom-input"
+            placeholder="Re-enter your password"
+            minlength="6"
+            required
+            autocomplete="new-password"
+          />
+        </div>
+      </div>
+
+      <!-- Optional Promo / Referral Code -->
+      <div class="input-group">
+        <label class="input-label" for="signup_promo">Promo / Referral Code (Optional)</label>
+        <div class="input-box-wrapper">
+          <input
+            type="text"
+            id="signup_promo"
+            class="custom-input"
+            placeholder="e.g. AVIATOR100"
+            style="text-transform: uppercase;"
+          />
+        </div>
+      </div>
+
+      <!-- 18+ & Terms Checkbox -->
+      <div class="terms-text">
+        <input type="checkbox" id="signup_terms" required checked />
+        <label for="signup_terms">
+          I certify that I am at least 18 years of age and agree to the <a href="javascript:void(0)">Terms of Service</a> &amp; <a href="javascript:void(0)">Fair Play Policy</a>.
+        </label>
+      </div>
+
+      <!-- Submit Sign Up Button -->
+      <button type="submit" class="submit-btn" id="signup_submit_btn">
+        <span>Create Aviator Account</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+        </svg>
+      </button>
+
+      <!-- Bottom Toggle Link -->
+      <div class="switch-footer">
+        Already have an account?
+        <button type="button" class="toggle-form-btn" onclick="switchTab('login')">Log In</button>
+      </div>
+    </form>
+
+    <!-- Security Footer -->
+    <div class="security-badge">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+      </svg>
+      <span>256-Bit SSL Encrypted &bull; Provably Fair Platform</span>
+    </div>
+  </div>
+
+  <script>
+    // --- 1. Toggle Tab Switcher (Login vs Sign Up) ---
+    function switchTab(mode) {
+      const loginTabBtn = document.getElementById('tab_login_btn');
+      const signupTabBtn = document.getElementById('tab_signup_btn');
+      const loginForm = document.getElementById('login_form');
+      const signupForm = document.getElementById('signup_form');
+      const brandSubtitle = document.getElementById('brand_subtitle');
+      const alertBox = document.getElementById('auth_alert');
+
+      // Clear previous alert messages
+      alertBox.className = 'alert-banner';
+      alertBox.style.display = 'none';
+
+      if (mode === 'login') {
+        loginTabBtn.classList.add('active');
+        signupTabBtn.classList.remove('active');
+        loginForm.classList.add('active');
+        signupForm.classList.remove('active');
+        brandSubtitle.textContent = 'Sign in with your mobile number to play';
+      } else {
+        signupTabBtn.classList.add('active');
+        loginTabBtn.classList.remove('active');
+        signupForm.classList.add('active');
+        loginForm.classList.remove('active');
+        brandSubtitle.textContent = 'Create an account to start flying & winning';
+      }
+    }
+
+    // --- 2. Password Visibility Toggle ---
+    function togglePasswordVisibility(inputId, iconId) {
+      const input = document.getElementById(inputId);
+      const icon = document.getElementById(iconId);
+
+      if (input.type === 'password') {
+        input.type = 'text';
+        // Icon changed to Eye-Off
+        icon.innerHTML = `
+          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+          <line x1="1" y1="1" x2="23" y2="23"></line>
+        `;
+      } else {
+        input.type = 'password';
+        // Icon changed back to Eye
+        icon.innerHTML = `
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+          <circle cx="12" cy="12" r="3"></circle>
+        `;
+      }
+    }
+
+    // --- 3. Alert / Toast Helper ---
+    function showAlert(message, type = 'error') {
+      const alertBox = document.getElementById('auth_alert');
+      alertBox.className = `alert-banner ${type}`;
+      alertBox.textContent = message;
+      alertBox.style.display = 'flex';
+    }
+
+    // --- 4. Handle Login Submission ---
+    function handleLogin(event) {
+      event.preventDefault();
+      const mobile = document.getElementById('login_mobile').value.trim();
+      const password = document.getElementById('login_password').value;
+      const code = document.getElementById('login_country_code').value;
+
+      if (!/^\d{10}$/.test(mobile)) {
+        showAlert('Please enter a valid 10-digit mobile number.', 'error');
+        return;
+      }
+
+      if (password.length < 4) {
+        showAlert('Please enter your valid account password.', 'error');
+        return;
+      }
+
+      // Save user session in localStorage
+      const userSession = {
+        mobile: `${code} ${mobile}`,
+        isLoggedIn: true,
+        loginTime: Date.now()
+      };
+      localStorage.setItem('aviator_user_session', JSON.stringify(userSession));
+
+      showAlert(`Welcome back! Logging into Aviator (${code} ${mobile})...`, 'success');
+
+      setTimeout(() => {
+        // Redirect or close modal if integrated
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ type: 'AVIATOR_LOGIN_SUCCESS', user: userSession }, '*');
+        }
+        alert(`Login Successful! Welcome to Aviator (${code} ${mobile})`);
+      }, 800);
+    }
+
+    // --- 5. Handle Sign Up Submission ---
+    function handleSignUp(event) {
+      event.preventDefault();
+      const mobile = document.getElementById('signup_mobile').value.trim();
+      const password = document.getElementById('signup_password').value;
+      const confirmPassword = document.getElementById('signup_confirm_password').value;
+      const code = document.getElementById('signup_country_code').value;
+      const terms = document.getElementById('signup_terms').checked;
+
+      if (!/^\d{10}$/.test(mobile)) {
+        showAlert('Please enter a valid 10-digit mobile number.', 'error');
+        return;
+      }
+
+      if (password.length < 6) {
+        showAlert('Password must be at least 6 characters long.', 'error');
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        showAlert('Passwords do not match! Please check again.', 'error');
+        return;
+      }
+
+      if (!terms) {
+        showAlert('You must accept the 18+ policy and terms.', 'error');
+        return;
+      }
+
+      // Save new user session
+      const newUser = {
+        mobile: `${code} ${mobile}`,
+        isLoggedIn: true,
+        registeredTime: Date.now()
+      };
+      localStorage.setItem('aviator_user_session', JSON.stringify(newUser));
+
+      showAlert(`Account created successfully! Welcome to Aviator!`, 'success');
+
+      setTimeout(() => {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ type: 'AVIATOR_SIGNUP_SUCCESS', user: newUser }, '*');
+        }
+        alert(`Registration Complete! Your Aviator wallet is ready.`);
+        switchTab('login');
+      }, 1000);
+    }
+
+    // --- 6. Forgot Password Handler ---
+    function handleForgotPassword() {
+      const mobile = prompt('Please enter your registered 10-digit mobile number for OTP reset:');
+      if (mobile && /^\d{10}$/.test(mobile.trim())) {
+        alert(`Password reset OTP has been dispatched to +91 ${mobile.trim()}.`);
+      } else if (mobile) {
+        alert('Invalid mobile number format. Please enter 10 digits.');
+      }
+    }
+
+    // Restrict mobile inputs to numbers only
+    ['login_mobile', 'signup_mobile'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('input', (e) => {
+          e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10);
+        });
+      }
+    });
+  </script>
+</body>
+</html>

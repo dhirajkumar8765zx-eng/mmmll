@@ -1,0 +1,6 @@
+{
+  "name": "Aviator 100x",
+  "description": "Live Aviator multiplier climbing game with real-time bet placement, auto-cashout, secure UPI recharge deposits, instant withdrawals, and live admin management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
