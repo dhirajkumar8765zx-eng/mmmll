@@ -47,7 +47,8 @@ export default function SideMenu({
   onToggleMusic,
   onToggleAnimation,
   onOpenModal,
-  onOpenTelegramSupport
+  onOpenTelegramSupport,
+  onOpenAdminAccess
 }: SideMenuProps) {
   const [showHistory, setShowHistory] = useState(false);
 
@@ -178,13 +179,20 @@ export default function SideMenu({
             {/* Sound Toggle */}
             <button 
               onClick={onToggleSound}
-              className="w-full flex items-center justify-between p-2.5 bg-zinc-900/60 hover:bg-zinc-900 border border-zinc-850/60 rounded-xl text-xs text-zinc-300 transition cursor-pointer"
+              className={`w-full flex items-center justify-between p-2.5 rounded-xl text-xs transition active:scale-95 cursor-pointer border ${
+                settings.soundEnabled 
+                  ? 'bg-zinc-900 border-red-500/40 text-white shadow-sm shadow-red-950/30' 
+                  : 'bg-zinc-900/40 hover:bg-zinc-900 border-zinc-850 text-zinc-400'
+              }`}
+              id="side_menu_sound_toggle_btn"
             >
               <span className="flex items-center gap-2">
-                {settings.soundEnabled ? <Volume2 className="w-4 h-4 text-red-500" /> : <VolumeX className="w-4 h-4 text-zinc-600" />}
-                Sound Effects
+                {settings.soundEnabled ? <Volume2 className="w-4 h-4 text-red-500 animate-pulse" /> : <VolumeX className="w-4 h-4 text-zinc-600" />}
+                <span className="font-medium">Sound Effects (आवाज़)</span>
               </span>
-              <span className="text-[10px] font-mono font-bold uppercase text-zinc-500">
+              <span className={`text-[10px] font-mono font-black uppercase px-2 py-0.5 rounded ${
+                settings.soundEnabled ? 'bg-red-500 text-white' : 'bg-zinc-800 text-zinc-500'
+              }`}>
                 {settings.soundEnabled ? 'ON' : 'OFF'}
               </span>
             </button>
@@ -192,13 +200,20 @@ export default function SideMenu({
             {/* Music Toggle */}
             <button 
               onClick={onToggleMusic}
-              className="w-full flex items-center justify-between p-2.5 bg-zinc-900/60 hover:bg-zinc-900 border border-zinc-850/60 rounded-xl text-xs text-zinc-300 transition cursor-pointer"
+              className={`w-full flex items-center justify-between p-2.5 rounded-xl text-xs transition active:scale-95 cursor-pointer border ${
+                settings.musicEnabled 
+                  ? 'bg-zinc-900 border-purple-500/40 text-white shadow-sm shadow-purple-950/30' 
+                  : 'bg-zinc-900/40 hover:bg-zinc-900 border-zinc-850 text-zinc-400'
+              }`}
+              id="side_menu_music_toggle_btn"
             >
               <span className="flex items-center gap-2">
                 <Music className={`w-4 h-4 ${settings.musicEnabled ? 'text-purple-400 animate-pulse' : 'text-zinc-600'}`} />
-                Background Beats
+                <span className="font-medium">Background Beats (संगीत)</span>
               </span>
-              <span className="text-[10px] font-mono font-bold uppercase text-zinc-500">
+              <span className={`text-[10px] font-mono font-black uppercase px-2 py-0.5 rounded ${
+                settings.musicEnabled ? 'bg-purple-600 text-white' : 'bg-zinc-800 text-zinc-500'
+              }`}>
                 {settings.musicEnabled ? 'ON' : 'OFF'}
               </span>
             </button>
@@ -324,6 +339,29 @@ export default function SideMenu({
               </div>
             )}
           </div>
+
+          {/* Operator Terminal Access */}
+          {onOpenAdminAccess && (
+            <div className="border-t border-zinc-900 pt-3">
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenAdminAccess();
+                }}
+                className="w-full flex items-center justify-between p-2.5 bg-purple-950/30 hover:bg-purple-950/60 border border-purple-800/40 hover:border-purple-600/70 rounded-xl text-xs font-bold text-purple-300 transition cursor-pointer shadow-sm"
+                id="side_menu_admin_btn"
+              >
+                <span className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-purple-400" />
+                  Operator Terminal (PIN: 7788)
+                </span>
+                <span className="text-[10px] px-2 py-0.5 rounded bg-purple-900/60 text-purple-200 uppercase font-mono">
+                  Inject 100x-200x
+                </span>
+              </button>
+            </div>
+          )}
 
         </div>
 

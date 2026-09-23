@@ -17,7 +17,10 @@ import {
   Users,
   Gamepad2,
   CreditCard,
-  User
+  User,
+  Volume2,
+  VolumeX,
+  Music
 } from 'lucide-react';
 
 import { Bet, DepositRequest, PastRound, GameSettings, GameStats, LivePlayer, WithdrawRequest, UserAccount } from './types';
@@ -50,7 +53,7 @@ const DEFAULT_SETTINGS: GameSettings = {
   freeBetClaimed: false,
   minBet: 10,
   maxBet: 10000,
-  maxMultiplier: 100,
+  maxMultiplier: 1000,
   upiId: 'babu0200@ybl',
   qrCodeUrl: '',
   telegramSupportId: '@lottaygent',
@@ -173,8 +176,9 @@ export default function App() {
         const parsed = JSON.parse(saved);
         if (parsed.upiId === 'aviator100x.operator@upi' || !parsed.upiId) {
           parsed.upiId = 'babu0200@ybl';
-          localStorage.setItem('aviator_settings', JSON.stringify(parsed));
         }
+        parsed.maxMultiplier = Math.max(Number(parsed.maxMultiplier) || 0, 1000);
+        localStorage.setItem('aviator_settings', JSON.stringify(parsed));
         return parsed;
       } catch {
         return DEFAULT_SETTINGS;
@@ -345,7 +349,18 @@ export default function App() {
   const forcedMultiplierModeRef = useRef<'persistent' | 'single'>(forcedMultiplierMode);
   forcedMultiplierModeRef.current = forcedMultiplierMode;
 
-  const handleSetForcedMultiplier = (val: number | null, mode?: 'persistent' | 'single') => {
+  const triggerTakeoffNow = () => {
+    if (gameState === 'waiting') {
+      countdownRef.current = 0;
+      setCountdown(0);
+      startFlightRef.current();
+    }
+  };
+
+  const handleSetForcedMultiplier = (
+    val: number | null, 
+    mode?: 'persistent' | 'single'
+  ) => {
     const nextMode = mode || forcedMultiplierMode;
     if (mode) {
       setForcedMultiplierMode(mode);
@@ -357,11 +372,10 @@ export default function App() {
 
     if (val !== null && val >= 1.0) {
       localStorage.setItem('aviator_forced_multiplier', val.toString());
-      // If plane is currently flying and hasn't crashed, immediately update active flight's crash target!
-      if (gameState === 'flying') {
-        currentCrashValue.current = val;
-      }
-      showToast(`🎯 Multiplier Injected: ${val.toFixed(2)}x (${nextMode === 'persistent' ? 'All Rounds Locked' : 'Next Round Only'})`, 'success');
+      // Unconditionally update active crash target so if plane is currently flying, it continues soaring to this target!
+      currentCrashValue.current = val;
+      const duration = Math.round(Math.sqrt((val - 1) / 0.05));
+      showToast(`🎯 Multiplier Injected: ${val.toFixed(2)}x (~${duration}s flight, ${nextMode === 'persistent' ? 'All Rounds Locked' : 'Next Round Only'})`, 'success');
     } else {
       localStorage.removeItem('aviator_forced_multiplier');
       showToast('Forced multiplier removed. Provably Fair RNG restored.', 'info');
@@ -483,15 +497,42 @@ export default function App() {
     localStorage.setItem('aviator_user_bets', JSON.stringify(userBetHistory));
   }, [userBetHistory]);
 
-  // Audio Context unlocker
+  // Comprehensive Mobile Audio Context unlocker (iOS Safari & Android Chrome)
   useEffect(() => {
-    const unlock = () => {
-      audio.init();
-      window.removeEventListener('click', unlock);
+    const unlockAudio = () => {
+      audio.unlock();
     };
-    window.addEventListener('click', unlock);
-    return () => window.removeEventListener('click', unlock);
+    const events = ['touchstart', 'touchend', 'pointerdown', 'click', 'keydown'];
+    events.forEach(ev => window.addEventListener(ev, unlockAudio, { passive: true }));
+    return () => {
+      events.forEach(ev => window.removeEventListener(ev, unlockAudio));
+    };
   }, []);
+
+  const handleToggleSound = () => {
+    audio.unlock();
+    const nextState = !settings.soundEnabled;
+    setSettings((s) => ({ ...s, soundEnabled: nextState }));
+    audio.setSoundEnabled(nextState);
+    if (nextState) {
+      audio.playTestChime();
+      showToast('🔊 Sound Enabled (फोन का वॉल्यूम ऑन रखें)', 'success');
+    } else {
+      showToast('🔇 Sound Muted', 'info');
+    }
+  };
+
+  const handleToggleMusic = () => {
+    audio.unlock();
+    const nextState = !settings.musicEnabled;
+    setSettings((s) => ({ ...s, musicEnabled: nextState }));
+    audio.setMusicEnabled(nextState);
+    if (nextState) {
+      showToast('🎵 Background Beats Started', 'success');
+    } else {
+      showToast('🔇 Background Music Muted', 'info');
+    }
+  };
 
   // Trigger flight takeoff
   const startFlight = () => {
@@ -503,6 +544,7 @@ export default function App() {
     const activeForced = forcedMultiplierRef.current;
     if (activeForced !== null && activeForced >= 1.00) {
       crashPoint = activeForced;
+      currentCrashValue.current = activeForced;
       if (forcedMultiplierModeRef.current === 'single') {
         setForcedMultiplier(null);
         forcedMultiplierRef.current = null;
@@ -516,13 +558,7 @@ export default function App() {
       } else {
         crashPoint = Math.floor(100 * (0.97 / (1.0 - r * 0.95))) / 100;
       }
-    }
-    
-    // If explicitly injected by operator, honor exact target without arbitrary clamp; else cap to maxMultiplier
-    if (activeForced !== null && activeForced >= 1.00) {
-      currentCrashValue.current = Math.max(1.00, crashPoint);
-    } else {
-      currentCrashValue.current = Math.max(1.00, Math.min(crashPoint, settingsRef.current.maxMultiplier));
+      currentCrashValue.current = Math.max(1.00, Math.min(crashPoint, settingsRef.current.maxMultiplier || 1000));
     }
 
     // Resolve scheduled/queued bets to active status and deduct balance
@@ -1157,6 +1193,7 @@ export default function App() {
           onAdjustBalance={handleAdjustBalance}
           onBackToGame={handleBackToGame}
           onLogoutAdmin={handleLogoutAdmin}
+          onFastTakeoff={triggerTakeoffNow}
         />
 
         {/* Global Toast for notifications in Admin view */}
@@ -1294,11 +1331,32 @@ export default function App() {
               </span>
             </div>
 
-            {/* Right: Vibrant Green Balance in INR + Hamburger Menu */}
-            <div className="flex items-center gap-3">
+            {/* Right: Vibrant Green Balance in INR + Quick Sound Toggle + Hamburger Menu */}
+            <div className="flex items-center gap-2 sm:gap-3">
               <span className="text-sm sm:text-base font-mono font-black text-[#28a745] tracking-tight">
                 {balance.toFixed(2)} INR
               </span>
+
+              {/* Quick Mobile Sound Button */}
+              <button
+                type="button"
+                onClick={handleToggleSound}
+                className={`p-1.5 rounded-lg border transition active:scale-90 cursor-pointer flex items-center justify-center ${
+                  settings.soundEnabled
+                    ? 'bg-zinc-900/90 border-red-500/50 text-red-500 shadow-sm shadow-red-950/40 ring-1 ring-red-500/20'
+                    : 'bg-zinc-950 border-zinc-800 text-zinc-600 hover:text-zinc-400'
+                }`}
+                title={settings.soundEnabled ? 'Sound ON (Tap to mute)' : 'Sound OFF (Tap to enable sound)'}
+                id="header_quick_sound_btn"
+                aria-label="Toggle Sound"
+              >
+                {settings.soundEnabled ? (
+                  <Volume2 className="w-4 h-4 text-red-500 animate-pulse" />
+                ) : (
+                  <VolumeX className="w-4 h-4 text-zinc-500" />
+                )}
+              </button>
+
               <button
                 type="button"
                 onClick={() => setSideMenuOpen(true)}
@@ -1326,9 +1384,13 @@ export default function App() {
             recentMultipliers={recentMultipliers}
             activeBets={activeBets}
             liveBetsCount={livePlayers.length + activeBets.filter((b) => b.status === 'placed' || b.status === 'queued').length}
+            forcedMultiplier={forcedMultiplier}
+            forcedMultiplierMode={forcedMultiplierMode}
             onPlaceBet={handlePlaceBet}
             onCancelBet={handleCancelBet}
             onCashOut={handleCashOut}
+            onSetForcedMultiplier={handleSetForcedMultiplier}
+            onFastTakeoff={triggerTakeoffNow}
           />
 
           {/* Authentic Spribe Bets Section: Placed DIRECTLY UNDER the Bet panel! */}
@@ -1344,10 +1406,18 @@ export default function App() {
         </div>
       </main>
 
-      {/* Game Clean Footer (No admin controls) */}
-      <footer className="w-full text-center py-3 border-t border-zinc-900/60 text-zinc-600 text-[11px] font-mono mt-auto" id="game_footer_bar">
-        <div className="max-w-7xl mx-auto px-4 flex items-center justify-center text-zinc-600">
+      {/* Game Clean Footer (With discreet operator trigger) */}
+      <footer className="w-full py-3 border-t border-zinc-900/60 text-zinc-600 text-[11px] font-mono mt-auto" id="game_footer_bar">
+        <div className="max-w-7xl mx-auto px-4 flex items-center justify-between text-zinc-600">
           <span>© 2026 Aviator 100x • Provably Fair Certified • 18+ Only</span>
+          <button
+            type="button"
+            onClick={() => setAdminAccessModalOpen(true)}
+            className="text-[10px] text-zinc-650 hover:text-zinc-400 font-mono transition flex items-center gap-1 cursor-pointer"
+            title="Operator Access Terminal (PIN: 7788)"
+          >
+            <span>🔐 Operator</span>
+          </button>
         </div>
       </footer>
 
@@ -1359,11 +1429,12 @@ export default function App() {
         betHistory={activeBets.filter(b => b.status === 'cashed_out' || b.status === 'crashed')}
         currentUser={currentUser}
         onOpenAuth={() => setAuthModalOpen(true)}
-        onToggleSound={() => setSettings((s) => ({ ...s, soundEnabled: !s.soundEnabled }))}
-        onToggleMusic={() => setSettings((s) => ({ ...s, musicEnabled: !s.musicEnabled }))}
+        onToggleSound={handleToggleSound}
+        onToggleMusic={handleToggleMusic}
         onToggleAnimation={() => setSettings((s) => ({ ...s, animationEnabled: !s.animationEnabled }))}
         onOpenModal={(modal) => setActiveModal(modal)}
         onOpenTelegramSupport={() => setTelegramSupportOpen(true)}
+        onOpenAdminAccess={() => setAdminAccessModalOpen(true)}
       />
 
       {/* Operator Access PIN Modal */}

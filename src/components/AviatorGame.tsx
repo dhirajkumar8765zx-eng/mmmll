@@ -24,9 +24,13 @@ interface AviatorGameProps {
   recentMultipliers: PastRound[];
   activeBets: Bet[];
   liveBetsCount?: number;
+  forcedMultiplier?: number | null;
+  forcedMultiplierMode?: 'persistent' | 'single';
   onPlaceBet: (panelId: number, amount: number, autoCash: boolean, autoCashMult: number) => void;
   onCancelBet: (panelId: number) => void;
   onCashOut: (panelId: number) => void;
+  onSetForcedMultiplier?: (mult: number | null, mode?: 'persistent' | 'single') => void;
+  onFastTakeoff?: () => void;
 }
 
 export default function AviatorGame({
@@ -37,9 +41,13 @@ export default function AviatorGame({
   recentMultipliers,
   activeBets,
   liveBetsCount = 0,
+  forcedMultiplier,
+  forcedMultiplierMode = 'persistent',
   onPlaceBet,
   onCancelBet,
-  onCashOut
+  onCashOut,
+  onSetForcedMultiplier,
+  onFastTakeoff
 }: AviatorGameProps) {
   // Dual betting panels
   const [panel1, setPanel1] = useState({ amount: 10, autoCash: false, autoCashMult: 2.0 });
@@ -68,17 +76,21 @@ export default function AviatorGame({
   // Exponential flight curve
   const simulatedTime = Math.sqrt(Math.max(0, multiplier - 1) / 0.05);
   
+  // Subtle aerodynamic banking and hover oscillation as altitude increases
+  const wobbleX = gameState === 'flying' && multiplier > 3 ? Math.sin(simulatedTime * 2.8) * 1.4 : 0;
+  const wobbleY = gameState === 'flying' && multiplier > 3 ? Math.cos(simulatedTime * 2.2) * 1.8 : 0;
+
   const planeX = gameState === 'waiting' 
     ? 15 
     : gameState === 'crashed'
     ? 98
-    : Math.min(12 + simulatedTime * 4.8, 80);
+    : Math.min(12 + simulatedTime * 4.8, 77) + wobbleX;
 
   const planeY = gameState === 'waiting' 
     ? 82 
     : gameState === 'crashed'
     ? -25
-    : Math.max(82 - Math.pow(simulatedTime, 1.25) * 2.7, 18);
+    : Math.max(82 - Math.pow(simulatedTime, 1.25) * 2.7, 18) + wobbleY;
 
   // Flight curve trajectory path
   const createPathString = () => {
@@ -139,12 +151,12 @@ export default function AviatorGame({
     if (panelId === 0) {
       setPanel1((prev) => ({
         ...prev,
-        autoCashMult: Math.max(1.01, Math.min(100, parseFloat((prev.autoCashMult + delta).toFixed(2))))
+        autoCashMult: Math.max(1.01, Math.min(1000, parseFloat((prev.autoCashMult + delta).toFixed(2))))
       }));
     } else {
       setPanel2((prev) => ({
         ...prev,
-        autoCashMult: Math.max(1.01, Math.min(100, parseFloat((prev.autoCashMult + delta).toFixed(2))))
+        autoCashMult: Math.max(1.01, Math.min(1000, parseFloat((prev.autoCashMult + delta).toFixed(2))))
       }));
     }
   };
@@ -199,6 +211,52 @@ export default function AviatorGame({
           <span className="text-sm font-black tracking-widest leading-none">···</span>
         </button>
       </div>
+
+      {/* Operator Target Injection Status Pill (If active) */}
+      {forcedMultiplier !== null && (
+        <div className="mb-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-950/80 via-zinc-900 to-purple-950/80 border border-purple-500/60 rounded-xl flex items-center justify-between text-xs font-mono shadow-md animate-fade-in" id="game_operator_injected_pill">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+            <span className="text-zinc-200">
+              🎯 Injected Target: <strong className="text-amber-300 text-sm font-black">{forcedMultiplier.toFixed(2)}x</strong>
+            </span>
+            <span className="hidden sm:inline text-[10px] text-purple-300">
+              (~{Math.round(Math.sqrt(Math.max(0, forcedMultiplier - 1) / 0.05))}s flight • {forcedMultiplierMode === 'persistent' ? 'All Rounds' : 'Single Round'})
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => onSetForcedMultiplier?.(100, 'persistent')}
+              className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition ${forcedMultiplier === 100 ? 'bg-amber-500 text-black font-black' : 'bg-zinc-800 text-zinc-300 hover:text-white'}`}
+            >
+              100x
+            </button>
+            <button
+              type="button"
+              onClick={() => onSetForcedMultiplier?.(150, 'persistent')}
+              className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition ${forcedMultiplier === 150 ? 'bg-amber-500 text-black font-black' : 'bg-zinc-800 text-zinc-300 hover:text-white'}`}
+            >
+              150x
+            </button>
+            <button
+              type="button"
+              onClick={() => onSetForcedMultiplier?.(200, 'persistent')}
+              className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition ${forcedMultiplier === 200 ? 'bg-amber-500 text-black font-black' : 'bg-zinc-800 text-zinc-300 hover:text-white'}`}
+            >
+              200x
+            </button>
+            <button
+              type="button"
+              onClick={() => onSetForcedMultiplier?.(null)}
+              className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-950/80 hover:bg-red-900 border border-red-800 text-red-300 cursor-pointer transition"
+              title="Reset to random provably fair flight"
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 2. Authentic Spribe Flight Arena / Stage */}
       <div
@@ -424,13 +482,30 @@ export default function AviatorGame({
                 </div>
               ) : (
                 <div className="text-center select-none" id="flying_multiplier_display">
+                  {multiplier >= 100 && (
+                    <div className="mb-1.5 inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-red-950/80 border border-amber-500/70 text-amber-300 text-[10px] sm:text-xs font-black uppercase tracking-widest animate-pulse shadow-lg shadow-red-950">
+                      <span>⚡ 100X+ STRATOSPHERE FLIGHT ⚡</span>
+                    </div>
+                  )}
                   <div className="flex items-baseline justify-center">
-                    <span className="text-5xl sm:text-6xl md:text-7xl font-sans font-black tracking-tight text-white drop-shadow-[0_4px_16px_rgba(0,0,0,0.8)]">
+                    <span className={`text-5xl sm:text-6xl md:text-7xl font-sans font-black tracking-tight drop-shadow-[0_4px_16px_rgba(0,0,0,0.8)] ${
+                      multiplier >= 100 
+                        ? 'text-transparent bg-clip-text bg-gradient-to-b from-yellow-200 via-amber-300 to-red-500 drop-shadow-[0_0_25px_rgba(245,158,11,0.7)]' 
+                        : multiplier >= 10 
+                        ? 'text-purple-300 drop-shadow-[0_0_15px_rgba(168,85,247,0.5)]' 
+                        : 'text-white'
+                    }`}>
                       {multiplier.toFixed(2)}
                     </span>
-                    <span className="text-3xl sm:text-4xl font-extrabold text-white ml-1">
+                    <span className={`text-3xl sm:text-4xl font-extrabold ml-1 ${
+                      multiplier >= 100 ? 'text-amber-400' : multiplier >= 10 ? 'text-purple-400' : 'text-white'
+                    }`}>
                       x
                     </span>
+                  </div>
+                  {/* Elapsed Flight Timer during flight */}
+                  <div className="text-[10px] sm:text-[11px] font-mono font-bold text-zinc-400/90 mt-1">
+                    Flight Time: {simulatedTime.toFixed(1)}s
                   </div>
                 </div>
               )}
